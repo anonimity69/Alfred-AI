@@ -1,12 +1,20 @@
-ffmpeg
-sounddevice 
-numpy
-torch
+# Audio and speech processing
+ffmpeg-python
+sounddevice
 SpeechRecognition
 pyaudio
-tk
 edge-tts
-asyncio
+
+# Core libraries
+numpy
+torch
+
+# Google Gemini API clients
 google-generativeai
 google-genai
-dotenv
+
+# Environment variable loader
+python-dotenv
+
+# GUI (tkinter comes with Python, no need to install via pip)
+# tk
