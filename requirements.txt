@@ -1,0 +1,9 @@
+ffmpeg
+sounddevice 
+numpy
+torch
+SpeechRecognition
+pyaudio
+tk
+edge-tts
+asyncio
