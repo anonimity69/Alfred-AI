@@ -4,6 +4,8 @@ sounddevice
 SpeechRecognition
 pyaudio
 edge-tts
+simpleaudio
+pydub
 
 # Core libraries
 numpy
