@@ -1,166 +1,107 @@
-# Standard library imports
-import tkinter as tk  # For building the GUI
-from tkinter import messagebox  # To display alert dialogs
-import asyncio  # To run asynchronous tasks
-import threading  # For running blocking operations without freezing the UI
-import os  # File and path management
-from datetime import datetime  # Timestamping logs and audio filenames
-import tempfile  # For creating temp directories and files
-# Local GUI modules
-from gui.components import create_button, create_scrolled_text  # Reusable UI components
-from gui.helpers import (
-    async_play_audio,  # Async wrapper for playing audio
-    get_log_path,      # Generates a log file path with timestamp
-    log_text           # Appends conversation text to a log file
-)
-# Core AI + Audio modules
-from utils import SpeechToText, AlfredChatbot, TextToSpeech
+import tkinter as tk
+from tkinter import scrolledtext, messagebox
+import threading
+import speech_recognition as sr
+from utils import AlfredChatbot  # your chatbot logic
 
-class AlfredApp:
-    # Main application class for the Alfred AI Assistant.
+class SimpleAlfredApp:
     def __init__(self, root):
-        ''' Initialize the main application window and components.
-        Args:
-            root (tk.Tk): The main application window.
-        '''
-        # === Core Modules ===
-        self.stt = SpeechToText()       # Converts speech → text
-        self.alfred = AlfredChatbot()   # Handles chatbot logic
-        self.tts = TextToSpeech()       # Converts text → speech
         self.root = root
         self.root.title("Alfred AI Assistant")
 
-        # === GUI Components ===
-        # Button: Press to start talking, release to process
-        self.start_button = create_button(
-            root,
-            text="Hold to Talk",
-            press_callback=self.on_press,
-            release_callback=self.on_release,
-        )
+        # Chatbot engine
+        self.alfred = AlfredChatbot()
 
-        # Scrolled text box: To display the chat between user and Alfred
-        self.response_box = create_scrolled_text(root, height=15, width=60)
+        # Buttons frame
+        button_frame = tk.Frame(root)
+        button_frame.pack(pady=10)
 
-        # Button: To replay the last audio response
-        self.play_button = create_button(
-            root,
-            text="Play Last Response",
-            command=self.play_last_audio,
-        )
+        self.listen_button = tk.Button(button_frame, text="Start Listening", command=self.start_listening)
+        self.listen_button.pack(side=tk.LEFT, padx=5)
 
-        # Other instance variables
-        self.last_audio_path = None     # Stores last generated audio file path
-        self.log_path = get_log_path()  # Generates new log file path
-        self.audio_data = None          # Placeholder for recorded audio
+        self.stop_button = tk.Button(button_frame, text="Stop Listening", command=self.stop_listening, state=tk.DISABLED)
+        self.stop_button.pack(side=tk.LEFT, padx=5)
 
-    # Called when the user presses the talk button
-    def on_press(self, event=None):
-        self.audio_data = None  # Reset any previous audio
-        self.update_response_box("Listening... (hold button)")
-        self.listening_thread = threading.Thread(
-            target=self._start_listening, daemon=True
-        )
-        self.listening_thread.start()
+        # Text box to display conversation
+        self.response_box = scrolledtext.ScrolledText(root, height=20, width=70)
+        self.response_box.pack(padx=10, pady=10)
 
+        # Speech recognizer
+        self.recognizer = sr.Recognizer()
 
-    # Records audio using microphone input
-    def _start_listening(self):
-        with self.stt.mic as source:
-            self.stt.recognizer.adjust_for_ambient_noise(source)  # Noise cancellation
+        # Control flags and variables
+        self.is_listening = False
+        self.stop_listening_flag = False
+        self.audio_chunks = []
+
+    def start_listening(self):
+        if self.is_listening:
+            messagebox.showinfo("Info", "Already listening...")
+            return
+        self.is_listening = True
+        self.stop_listening_flag = False
+        self.audio_chunks = []
+        self.update_text("Start speaking after a few seconds\n")
+        self.listen_button.config(state=tk.DISABLED)
+        self.stop_button.config(state=tk.NORMAL)
+        threading.Thread(target=self.listen_and_process, daemon=True).start()
+
+    def stop_listening(self):
+        if not self.is_listening:
+            return
+        self.stop_listening_flag = True
+        self.update_text("Stopping listening early...\n")
+        self.stop_button.config(state=tk.DISABLED)
+
+    def listen_and_process(self):
+        with sr.Microphone() as source:
+            self.recognizer.adjust_for_ambient_noise(source)
+            silence_limit = 10  # seconds of silence to stop recording
+            silence_timer = 0
+
+            while silence_timer < silence_limit:
+                if self.stop_listening_flag:
+                    break
+                try:
+                    audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=5)
+                    self.audio_chunks.append(audio)
+                    silence_timer = 0  # reset silence timer on audio
+                except sr.WaitTimeoutError:
+                    silence_timer += 1  # increment silence timer for each second of silence
+
+        if not self.audio_chunks:
+            self.update_text("No speech detected.\n")
+            self.finish_listening()
+            return
+
+        full_text = ""
+        for chunk in self.audio_chunks:
             try:
-                # Listen until button is released; no timeout limit
-                self.audio_data = self.stt.recognizer.listen(
-                    source, timeout=None, phrase_time_limit=None
-                )
-                print("[DEBUG] New audio recorded.")
-            except Exception as e:
-                print(f"[ERROR] Failed to record audio: {e}")
-                self.audio_data = None
-
-    # Called when the user releases the talk button
-    def on_release(self, event=None):
-        if self.audio_data:
-            # Run audio processing pipeline in a separate thread
-            threading.Thread(
-                target=self._process_pipeline_from_audio, daemon=True
-            ).start()
-        else:
-            self.update_response_box("⚠️ Didn't catch anything.\n")
-
-    # Wrapper to safely run an async function in a thread
-    def _process_pipeline_from_audio(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.pipeline_with_audio())
-        loop.close()
-
-    # The full AI pipeline from voice → text → chatbot → voice
-    async def pipeline_with_audio(self):
-        try:
-            text = ""
-            try:
-                # Convert audio to text using Google STT
-                text = self.stt.recognizer.recognize_google(self.audio_data)
+                text = self.recognizer.recognize_google(chunk)
+                full_text += text + " "
             except Exception:
-                text = ""
+                pass  # ignore chunks that fail to recognize
 
-            if not text:
-                self.update_response_box("Didn't catch that. Try again.\n")
-                return
+        full_text = full_text.strip()
+        if not full_text:
+            self.update_text("Could not understand any audio.\n")
+            self.finish_listening()
+            return
 
-            # Display and log user input
-            self.update_response_box(f"👤 You: {text}")
-            log_text(self.log_path, f"You: {text}")
+        self.update_text(f"You said: {full_text}\n")
 
-            # Get chatbot response
-            response = self.alfred.chat(text)
-            if not response:
-                self.update_response_box("Alfred encountered an issue.")
-                return
+        # Get chatbot response
+        response = self.alfred.chat(full_text)
+        self.update_text(f"Alfred: {response}\n")
 
-            # Display and log AI response
-            self.update_response_box(f"Alfred: {response}")
-            log_text(self.log_path, f"Alfred: {response}")
+        self.finish_listening()
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
-                audio_file = temp_audio.name
+    def finish_listening(self):
+        self.is_listening = False
+        self.stop_listening_flag = False
+        self.listen_button.config(state=tk.NORMAL)
+        self.stop_button.config(state=tk.DISABLED)
 
-            await self.tts.speak(response, audio_file)
-            self.last_audio_path = audio_file
-
-            # Play the audio in a separate thread and schedule its deletion
-            async_play_audio(audio_file)
-
-            # Schedule the file for deletion after a short delay
-            threading.Timer(5.0, self.cleanup_audio_file, args=[audio_file]).start()
-        except Exception as e:
-            self.update_response_box(f"Error: {e}")
-        finally:
-            self.update_response_box("Listening stopped.\n")
-
-    # Updates the scrollable response box with new messages
-    def update_response_box(self, text):
-        self.response_box.insert(tk.END, text + "\n")
+    def update_text(self, message):
+        self.response_box.insert(tk.END, message)
         self.response_box.see(tk.END)
-
-    # Cleans up temporary audio files after playback
-    def cleanup_audio_file(self, path):
-        try:
-            if os.path.exists(path):
-                os.remove(path)
-                if self.last_audio_path == path:
-                    self.last_audio_path = None
-                print(f"[INFO] Deleted temp audio file: {path}")
-        except Exception as e:
-            print(f"[WARN] Could not delete temp file: {e}")
-
-    # Play the last generated response audio if it exists
-    def play_last_audio(self):
-        if self.last_audio_path and os.path.exists(self.last_audio_path):
-            async_play_audio(self.last_audio_path)
-            # Optionally delete after playing again
-            threading.Timer(3.0, self.cleanup_audio_file, args=[self.last_audio_path]).start()
-        else:
-            messagebox.showinfo("No Audio", "Audio has already been cleared.")
-

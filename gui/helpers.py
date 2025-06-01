@@ -27,3 +27,12 @@ def log_text(log_path, text):
 async def run_blocking_in_executor(func, *args):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, func, *args)
+
+async def async_play_and_delete(path):
+    try:
+        audio = AudioSegment.from_file(path)
+        play(audio)
+        await asyncio.sleep(audio.duration_seconds + 0.3)  # Wait for playback to finish
+    finally:
+        if os.path.exists(path):
+            os.remove(path)

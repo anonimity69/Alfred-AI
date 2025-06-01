@@ -1,0 +1,16 @@
+You: can you hear me hi hello
+Alfred: Good afternoon. Yes, I can hear you perfectly well. How may I be of assistance today?
+
+You: like in Kolkata today do you know about
+Alfred: Yes, I am aware of matters in Kolkata today.
+
+The weather in Kolkata is partly cloudy with isolated thunderstorms possible. The temperature is expected to reach a high of 92°F (33°C), but it may feel like 40.6 °C. There is a 30% chance of rain.
+
+Some of the latest news from Kolkata includes:
+
+*   A new CFSL building in Rajarhat has been inaugurated by Amit Shah.
+*   NIA raids have been conducted in connection with a CRPF officer "espionage" case linked to Pakistan.
+*   A man was allegedly denied entry into a theatre for wearing a lungi, sparking debate about "cultural supremacy".
+
+Is there anything specific you would like to know?
+
