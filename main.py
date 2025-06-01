@@ -2,12 +2,12 @@ import tkinter as tk
 import threading
 import asyncio
 import io
-import simpleaudio as sa  # For audio playback (WAV)
-from pydub import AudioSegment  # For MP3 to WAV conversion
-import edge_tts  # For text-to-speech synthesis
-from utils.speechtotext import SpeechToText
-from utils.texttospeech import TextToSpeech
-from utils.alfredai_engine import AlfredChatbot
+
+import simpleaudio as sa  # For in-memory WAV audio playback
+from pydub import AudioSegment  # For MP3-to-WAV conversion
+import edge_tts  # For direct TTS streaming (matches your utils.texttospeech dependency)
+
+from utils import SpeechToText, TextToSpeech, AlfredChatbot
 
 class AlfredGUI:
     def __init__(self, root):
@@ -22,71 +22,66 @@ class AlfredGUI:
         self.text_box = tk.Text(root, height=10, font=("Courier", 12), wrap=tk.WORD)
         self.text_box.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-        # --- Utilities ---
-        self.stt = SpeechToText(self.label, self.text_box)
-        self.tts = TextToSpeech()
+        # --- Core AI & Audio Classes ---
         self.alfred = AlfredChatbot()
+        self.tts = TextToSpeech()
+        # The callback will append messages to the transcript box
+        self.stt = SpeechToText(callback=self.on_speech_event)
 
         # --- Controls ---
         button_frame = tk.Frame(root)
         button_frame.pack(pady=10)
-
         self.start_button = tk.Button(button_frame, text="Start Listening", command=self.start_listening, width=18, bg="lightgreen")
         self.start_button.pack(side=tk.LEFT, padx=5)
-
         self.stop_button = tk.Button(button_frame, text="Stop", command=self.stop_listening, width=10, bg="lightcoral")
         self.stop_button.pack(side=tk.LEFT, padx=5)
-
         self.clear_button = tk.Button(button_frame, text="Clear Transcript", command=self.clear_transcript, width=15)
         self.clear_button.pack(side=tk.LEFT, padx=5)
 
-    # --- Button actions ---
+        # Speech result for flow control
+        self.last_transcribed = None
+
+    def on_speech_event(self, message):
+        """Callback for STT events/messages, and capture the most recent transcription."""
+        self.text_box.insert(tk.END, f"{message}\n")
+        self.text_box.see(tk.END)
+        if message.startswith("You said: "):
+            self.last_transcribed = message[len("You said: "):]
+            # Launch Alfred workflow in a new thread so GUI doesn't freeze
+            threading.Thread(target=self.handle_alfred_response, daemon=True).start()
+
     def start_listening(self):
-        # Start the speech-to-text pipeline in a background thread
-        threading.Thread(target=self.listen_and_respond, daemon=True).start()
+        """Start the speech-to-text process."""
+        self.last_transcribed = None
+        self.stt.start()
+        self.label.config(text="Listening...")
 
     def stop_listening(self):
-        # Stop STT listening (uses class method)
+        """Stop the speech-to-text process."""
         self.stt.stop()
+        self.label.config(text="Recognition stopped.")
 
     def clear_transcript(self):
-        # Clear the transcript box using class method
-        self.stt.clear()
+        """Clear the transcript text box."""
+        self.text_box.delete("1.0", tk.END)
+        self.label.config(text="Transcript cleared.")
 
-    # --- Main pipeline: STT -> Alfred -> TTS ---
-    def listen_and_respond(self):
-        # 1. Start listening for speech
-        self.stt.start()
+    def handle_alfred_response(self):
+        """Handles the full pipeline: user speech -> Alfred reply -> TTS playback."""
+        if not self.last_transcribed:
+            return
 
-        # Wait for a single utterance
-        self.label.config(text="Listening...")
-        with self.stt.mic as source:
-            self.stt.recognizer.adjust_for_ambient_noise(source)
-            try:
-                audio = self.stt.recognizer.listen(source, timeout=5, phrase_time_limit=5)
-                text = self.stt.recognizer.recognize_google(audio)
-                self.text_box.insert(tk.END, f"You said: {text}\n")
-                self.text_box.see(tk.END)
-            except Exception as e:
-                self.text_box.insert(tk.END, f"Error: {str(e)}\n")
-                self.label.config(text="An error occurred.")
-                return
-
-        self.stt.stop()
-        self.label.config(text="Thinking...")
-
-        # 2. Send text to Alfred, get response
-        response = self.get_alfred_response(text)
+        self.label.config(text="Alfred is thinking...")
+        response = self.get_alfred_response(self.last_transcribed)
         self.text_box.insert(tk.END, f"Alfred: {response}\n")
         self.text_box.see(tk.END)
 
-        # 3. Speak Alfred's response (TTS)
         self.label.config(text="Speaking...")
         asyncio.run(self.speak_and_play(response))
         self.label.config(text="Ready.")
 
     def get_alfred_response(self, prompt):
-        # Use AlfredChatbot.chat() but capture its stdout output
+        """Runs AlfredChatbot.chat() and captures the full streamed response as a string."""
         old_print = print
         response_accum = []
 
@@ -103,7 +98,7 @@ class AlfredGUI:
         return ''.join(response_accum).strip()
 
     async def speak_and_play(self, text):
-        # Use edge-tts to synthesize, pydub to convert, simpleaudio to play
+        """Streams TTS audio to memory, converts to WAV, and plays it (no saving to disk)."""
         communicate = edge_tts.Communicate(text=text, voice=self.tts.voice)
         audio_stream = io.BytesIO()
         async for chunk in communicate.stream():
@@ -119,7 +114,6 @@ class AlfredGUI:
         wave_obj = sa.WaveObject.from_wave_file(wav_io)
         play_obj = wave_obj.play()
         play_obj.wait_done()
-
 
 if __name__ == "__main__":
     root = tk.Tk()

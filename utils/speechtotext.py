@@ -1,3 +1,9 @@
+# ###################################### #
+# File: speechtotext.py                  #
+# Author: Shrayanendra Nath Mandal       #
+# Date: 06/01/2025                       #
+# Description: Speech to Text convertor  #
+# ###################################### #
 import threading
 import speech_recognition as sr
 

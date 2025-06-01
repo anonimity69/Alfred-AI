@@ -1,3 +1,10 @@
+# ###################################### #
+# File: alfredai_engine.py               #
+# Author: Shrayanendra Nath Mandal       #
+# Date: 06/01/2025                       #
+# Description: Uses Gemini API for       #
+# chatbot engine                         #
+# ###################################### #
 import os
 from google import genai
 from google.genai import types
