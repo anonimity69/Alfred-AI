@@ -1,0 +1,13 @@
+You: hello hello
+Alfred: Greetings. I trust this day finds you well? Please, do let me know how I may be of assistance.
+
+You: hello hello
+Alfred: A most persistent greeting. How might I be of service to you on this fine day?
+
+You: tell me what's the weather
+Alfred: Well, according to my sources, the weather seems to be partly cloudy with a slight chance of showers and thunderstorms this evening, then mostly clear after midnight. The low will be in the mid 50s. The wind will be Northwest at 5 to 10 mph. There is a 20 percent chance of rain.
+
+The high will be in the mid 80s. The wind will be North around 5 mph becoming east in the afternoon.
+
+I trust this is satisfactory?
+

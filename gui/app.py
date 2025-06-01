@@ -4,13 +4,13 @@ import asyncio
 import threading
 import os
 from datetime import datetime
-from components import create_button, create_scrolled_text
-from utils import SpeechToText, AlfredChatbot, TextToSpeech
-from helpers import (
+from gui.components import create_button, create_scrolled_text
+from gui.helpers import (
     async_play_audio,
     get_log_path,
     log_text,
 )
+from utils import SpeechToText, AlfredChatbot, TextToSpeech
 
 class AlfredApp:
     def __init__(self, root):
@@ -24,17 +24,14 @@ class AlfredApp:
             press_callback=self.on_press,
             release_callback=self.on_release,
         )
-        self.start_button.pack(pady=10)
 
         self.response_box = create_scrolled_text(root, height=15, width=60)
-        self.response_box.pack(padx=10, pady=10)
 
         self.play_button = create_button(
             root,
             text="🔊 Play Last Response",
             command=self.play_last_audio,
         )
-        self.play_button.pack(pady=5)
 
         # AI and Speech modules
         self.stt = SpeechToText()
@@ -54,7 +51,7 @@ class AlfredApp:
         with self.stt.mic as source:
             self.stt.recognizer.adjust_for_ambient_noise(source)
             try:
-                self.audio_data = self.stt.recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                self.audio_data = self.stt.recognizer.listen(source, timeout=None, phrase_time_limit=None)
             except Exception:
                 self.audio_data = None
 
@@ -97,8 +94,8 @@ class AlfredApp:
             await self.tts.speak(response, audio_file)
             self.last_audio_path = audio_file
 
-            # Play audio asynchronously
-            await async_play_audio(audio_file)
+            # Play audio asynchronously but note this is not awaitable properly due to threading
+            async_play_audio(audio_file)
 
         except Exception as e:
             self.update_response_box(f"⚠️ Error: {e}")
@@ -111,7 +108,6 @@ class AlfredApp:
 
     def play_last_audio(self):
         if self.last_audio_path and os.path.exists(self.last_audio_path):
-            # Run async playback in thread-safe way
-            asyncio.run(async_play_audio(self.last_audio_path))
+            async_play_audio(self.last_audio_path)
         else:
             messagebox.showinfo("No Audio", "No audio has been generated yet.")

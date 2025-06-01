@@ -1,19 +1,18 @@
 import tkinter as tk
 from tkinter import scrolledtext
 
-def create_push_to_talk_button(root, on_press, on_release):
-    button = tk.Button(root, text="🎙️ Hold to Talk")
-    button.bind("<ButtonPress>", on_press)
-    button.bind("<ButtonRelease>", on_release)
+def create_button(root, text, command=None, press_callback=None, release_callback=None):
+    button = tk.Button(root, text=text)
+    if command:
+        button.config(command=command)
+    if press_callback:
+        button.bind("<ButtonPress>", press_callback)
+    if release_callback:
+        button.bind("<ButtonRelease>", release_callback)
     button.pack(pady=10)
     return button
 
-def create_response_box(root):
-    box = scrolledtext.ScrolledText(root, height=15, width=60, wrap=tk.WORD)
+def create_scrolled_text(root, height=15, width=60):
+    box = scrolledtext.ScrolledText(root, height=height, width=width, wrap=tk.WORD)
     box.pack(padx=10, pady=10)
     return box
-
-def create_play_button(root, command):
-    button = tk.Button(root, text="🔊 Play Last Response", command=command)
-    button.pack(pady=5)
-    return button
