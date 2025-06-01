@@ -1,121 +1,183 @@
 import tkinter as tk
-import threading
+from tkinter import messagebox, scrolledtext
 import asyncio
-import io
+import tempfile
+import os
+from datetime import datetime
+from utils import SpeechToText, AlfredChatbot, TextToSpeech
+from playsound import playsound
+import threading
+from pydub import AudioSegment
+from pydub.playback import play
 
-import simpleaudio as sa  # For in-memory WAV audio playback
-from pydub import AudioSegment  # For MP3-to-WAV conversion
-import edge_tts  # For direct TTS streaming (matches your utils.texttospeech dependency)
+# Ensure directories exist
+os.makedirs("logs", exist_ok=True)
+os.makedirs("Outputs", exist_ok=True)
 
-from utils import SpeechToText, TextToSpeech, AlfredChatbot
-
-class AlfredGUI:
+class AlfredApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Alfred AI Assistant")
-        self.root.geometry("700x420")
 
-        # --- UI Elements ---
-        self.label = tk.Label(root, text="Press 'Start Listening' and speak...", font=("Helvetica", 14))
-        self.label.pack(pady=10)
+        # Components
+        self.start_button = tk.Button(root, text="🎙️ Hold to Talk")
+        self.start_button.bind("<ButtonPress>", self.on_press)
+        self.start_button.bind("<ButtonRelease>", self.on_release)
+        self.start_button.pack(pady=10)
 
-        self.text_box = tk.Text(root, height=10, font=("Courier", 12), wrap=tk.WORD)
-        self.text_box.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        self.response_box = scrolledtext.ScrolledText(root, height=15, width=60, wrap=tk.WORD)
+        self.response_box.pack(padx=10, pady=10)
 
-        # --- Core AI & Audio Classes ---
+        self.play_button = tk.Button(root, text="🔊 Play Last Response", command=self.play_last_audio)
+        self.play_button.pack(pady=5)
+
+        # AI + Voice Modules
+        self.stt = SpeechToText()
         self.alfred = AlfredChatbot()
         self.tts = TextToSpeech()
-        # The callback will append messages to the transcript box
-        self.stt = SpeechToText(callback=self.on_speech_event)
-
-        # --- Controls ---
-        button_frame = tk.Frame(root)
-        button_frame.pack(pady=10)
-        self.start_button = tk.Button(button_frame, text="Start Listening", command=self.start_listening, width=18, bg="lightgreen")
-        self.start_button.pack(side=tk.LEFT, padx=5)
-        self.stop_button = tk.Button(button_frame, text="Stop", command=self.stop_listening, width=10, bg="lightcoral")
-        self.stop_button.pack(side=tk.LEFT, padx=5)
-        self.clear_button = tk.Button(button_frame, text="Clear Transcript", command=self.clear_transcript, width=15)
-        self.clear_button.pack(side=tk.LEFT, padx=5)
-
-        # Speech result for flow control
-        self.last_transcribed = None
-
-    def on_speech_event(self, message):
-        """Callback for STT events/messages, and capture the most recent transcription."""
-        self.text_box.insert(tk.END, f"{message}\n")
-        self.text_box.see(tk.END)
-        if message.startswith("You said: "):
-            self.last_transcribed = message[len("You said: "):]
-            # Launch Alfred workflow in a new thread so GUI doesn't freeze
-            threading.Thread(target=self.handle_alfred_response, daemon=True).start()
+        self.last_audio_path = None
+        self.log_path = os.path.join("logs", datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt")
 
     def start_listening(self):
-        """Start the speech-to-text process."""
-        self.last_transcribed = None
-        self.stt.start()
-        self.label.config(text="Listening...")
+        self.start_button.config(state=tk.DISABLED)
+        threading.Thread(target=self.run_pipeline, daemon=True).start()
 
-    def stop_listening(self):
-        """Stop the speech-to-text process."""
-        self.stt.stop()
-        self.label.config(text="Recognition stopped.")
+    def run_pipeline(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.pipeline())
+        loop.close()
 
-    def clear_transcript(self):
-        """Clear the transcript text box."""
-        self.text_box.delete("1.0", tk.END)
-        self.label.config(text="Transcript cleared.")
-
-    def handle_alfred_response(self):
-        """Handles the full pipeline: user speech -> Alfred reply -> TTS playback."""
-        if not self.last_transcribed:
-            return
-
-        self.label.config(text="Alfred is thinking...")
-        response = self.get_alfred_response(self.last_transcribed)
-        self.text_box.insert(tk.END, f"Alfred: {response}\n")
-        self.text_box.see(tk.END)
-
-        self.label.config(text="Speaking...")
-        asyncio.run(self.speak_and_play(response))
-        self.label.config(text="Ready.")
-
-    def get_alfred_response(self, prompt):
-        """Runs AlfredChatbot.chat() and captures the full streamed response as a string."""
-        old_print = print
-        response_accum = []
-
-        def fake_print(*args, **kwargs):
-            end = kwargs.get('end', '\n')
-            response_accum.append(' '.join(str(a) for a in args) + end)
-
+    async def pipeline(self):
         try:
-            globals()['print'] = fake_print
-            self.alfred.chat(prompt)
+            self.update_response_box("🎙️ Listening...")
+            text = await self.capture_speech()
+
+            if not text:
+                self.update_response_box("🤖 Didn't catch that. Try again.")
+                return
+
+            self.update_response_box(f"👤 You: {text}")
+            self.log(f"You: {text}")
+
+            response = self.alfred.chat(text)
+
+            if not response:
+                self.update_response_box("🤖 Alfred encountered an issue.")
+                return
+
+            self.update_response_box(f"🤖 Alfred: {response}")
+            self.log(f"Alfred: {response}")
+
+            audio_file = os.path.join("Outputs", datetime.now().strftime("%H-%M-%S") + ".mp3")
+            await self.tts.speak(response, audio_file)
+            self.last_audio_path = audio_file
+            audio = AudioSegment.from_file(audio_file, format="mp3")
+            play(audio)
+
+        except Exception as e:
+            self.update_response_box(f"⚠️ Error: {e}")
         finally:
-            globals()['print'] = old_print
+            self.start_button.config(state=tk.NORMAL)
 
-        return ''.join(response_accum).strip()
+    async def capture_speech(self):
+        loop = asyncio.get_event_loop()
+        future = loop.run_in_executor(None, self._blocking_stt)
+        return await future
 
-    async def speak_and_play(self, text):
-        """Streams TTS audio to memory, converts to WAV, and plays it (no saving to disk)."""
-        communicate = edge_tts.Communicate(text=text, voice=self.tts.voice)
-        audio_stream = io.BytesIO()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_stream.write(chunk["data"])
-        audio_stream.seek(0)
+    def _blocking_stt(self):
+        with self.stt.mic as source:
+            self.stt.recognizer.adjust_for_ambient_noise(source)
+            try:
+                audio = self.stt.recognizer.listen(source, timeout=5, phrase_time_limit=5)
+                return self.stt.recognizer.recognize_google(audio)
+            except Exception:
+                return ""
 
-        # Convert MP3 bytes to WAV in memory for playback
-        seg = AudioSegment.from_file(audio_stream, format="mp3")
-        wav_io = io.BytesIO()
-        seg.export(wav_io, format="wav")
-        wav_io.seek(0)
-        wave_obj = sa.WaveObject.from_wave_file(wav_io)
-        play_obj = wave_obj.play()
-        play_obj.wait_done()
+    def update_response_box(self, text):
+        self.response_box.insert(tk.END, text + "\n")
+        self.response_box.see(tk.END)
+
+    def play_last_audio(self):
+        if self.last_audio_path and os.path.exists(self.last_audio_path):
+            threading.Thread(target=self._play_audio_file, daemon=True).start()
+        else:
+            messagebox.showinfo("No Audio", "No audio has been generated yet.")
+
+    def _play_audio_file(self):
+        try:
+            audio = AudioSegment.from_file(self.last_audio_path, format="mp3")
+            play(audio)
+        except Exception as e:
+            self.update_response_box(f"⚠️ Audio Playback Error: {e}")
+
+    def log(self, text):
+        with open(self.log_path, "a", encoding="utf-8") as f:
+            f.write(text + "\n")
+
+    def on_press(self, event=None):
+        self.update_response_box("🎤 Listening... (hold button)")
+        self._listening_thread = threading.Thread(target=self._start_listening, daemon=True)
+        self._listening_thread.start()
+
+    def _start_listening(self):
+        with self.stt.mic as source:
+            self.stt.recognizer.adjust_for_ambient_noise(source)
+            try:
+                self.audio_data = self.stt.recognizer.listen(source, timeout=5, phrase_time_limit=10)
+            except Exception:
+                self.audio_data = None
+
+    def on_release(self, event=None):
+        if hasattr(self, 'audio_data') and self.audio_data:
+            threading.Thread(target=self._process_pipeline_from_audio, daemon=True).start()
+        else:
+            self.update_response_box("⚠️ Didn't catch anything.\n")
+
+    def _process_pipeline_from_audio(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.pipeline_with_audio())
+        loop.close()
+
+    async def pipeline_with_audio(self):
+        try:
+            text = ""
+            try:
+                text = self.stt.recognizer.recognize_google(self.audio_data)
+            except Exception:
+                text = ""
+
+            if not text:
+                self.update_response_box("🤖 Didn't catch that. Try again.\n")
+                return
+
+            self.update_response_box(f"👤 You: {text}")
+            self.log(f"You: {text}")
+
+            response = self.alfred.chat(text)
+
+            if not response:
+                self.update_response_box("🤖 Alfred encountered an issue.")
+                return
+
+            self.update_response_box(f"🤖 Alfred: {response}")
+            self.log(f"Alfred: {response}")
+
+            audio_file = os.path.join("Outputs", datetime.now().strftime("%H-%M-%S") + ".mp3")
+            await self.tts.speak(response, audio_file)
+            self.last_audio_path = audio_file
+
+            audio = AudioSegment.from_file(audio_file, format="mp3")
+            play(audio)
+
+        except Exception as e:
+            self.update_response_box(f"⚠️ Error: {e}")
+        finally:
+            self.start_button.config(state=tk.NORMAL)
+            self.update_response_box("🎤 Listening stopped.\n") 
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = AlfredGUI(root)
+    app = AlfredApp(root)
     root.mainloop()

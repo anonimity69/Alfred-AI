@@ -6,7 +6,7 @@ pyaudio
 edge-tts
 simpleaudio
 pydub
-
+playsound
 # Core libraries
 numpy
 torch

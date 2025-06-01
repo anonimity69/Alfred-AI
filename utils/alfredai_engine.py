@@ -82,8 +82,8 @@ class AlfredChatbot:
             print(chunk.text, end="", flush=True)
             response_text += chunk.text
         print()  # Newline after response
-
         self.add_model_message(response_text)
+        return response_text
 
 def main():
     bot = AlfredChatbot()
