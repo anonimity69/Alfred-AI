@@ -7,3 +7,6 @@ pyaudio
 tk
 edge-tts
 asyncio
+google-generativeai
+google-genai
+dotenv

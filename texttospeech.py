@@ -20,6 +20,7 @@ class TextToSpeech:
 if __name__ == "__main__":
     tts = TextToSpeech(voice="en-GB-RyanNeural")
     tts.generate(
-        text="Hello! I'm Alfred, your AI assistant. How can I help you today?",
-        output_path="Outputs/alfred_edge_tts_1.mp3"
+        text='''Very well, sir. I shall endeavour to remind you to hydrate at regular intervals.
+Might I suggest a glass of water now, to get ahead of the curve, as it were? Staying ahead is always advisable.''',
+        output_path="Outputs/alfred_edge_tts_water.mp3"
     )

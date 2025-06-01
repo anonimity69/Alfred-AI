@@ -1,4 +1,5 @@
 *.venv
 *.pvc
+*.env
 Outputs
 References
