@@ -1,9 +1,10 @@
-# ###################################### #
-# File: texttospeech.py                  #
-# Author: Shrayanendra Nath Mandal       #
-# Date: 06/01/2025                       #
-# Description: Text to Speech convertor  #
-# ###################################### #
+# ######################################                    #
+# File: texttospeech.py                                     #
+# Author: Shrayanendra Nath Mandal, Preetish Majumdar       #
+# Date: 06/01/2025                                          #
+# Description: Text to Speech convertor                     #
+# ######################################                    #
+
 import asyncio
 import edge_tts
 
