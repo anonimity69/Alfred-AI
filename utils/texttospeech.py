@@ -1,10 +1,12 @@
-# ######################################                    #
-# File: texttospeech.py                                     #
-# Author: Shrayanendra Nath Mandal, Preetish Majumdar       #
-# Date: 06/01/2025                                          #
-# Description: Text to Speech convertor                     #
-# ######################################                    #
-
+"""
+#############################################################
+# File        : texttospeech.py                             #
+# Authors     : Shrayanendra Nath Mandal, Preetish Majumdar #
+# Date        : 2025-06-01                                  #
+# Description : GUI-based Alfred AI Assistant using Gemini  #
+#               API, Speech Recognition, and Text to Speech #
+#############################################################
+"""
 import asyncio
 import edge_tts
 
