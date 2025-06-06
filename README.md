@@ -22,29 +22,6 @@ Because you deserve a no-nonsense, efficient AI assistant that listens on your t
 
 ---
 
-## 📦 Project Structure
-
-AlfredAI/
-├── core/
-│ ├── init.py
-│ ├── pipeline.py # Async pipeline for processing audio and chatbot interaction
-│ ├── speech_to_text.py # Speech recognition module
-│ ├── alfred_chatbot.py # Chatbot logic
-│ └── text_to_speech.py # TTS engine
-├── gui/
-│ ├── init.py
-│ ├── app.py # Main AlfredApp class managing GUI and logic
-│ ├── components.py # Tkinter UI widgets (buttons, text boxes)
-│ └── helpers.py # Async playback, logging utilities
-├── logs/ # Conversation logs saved here
-├── Outputs/ # Audio response files saved here
-├── main.py # Entry point launching the app
-├── requirements.txt # Dependencies
-└── README.md
-
-
----
-
 ## ⚙️ Installation & Setup
 
 1. **Clone the repo**:
