@@ -10,9 +10,9 @@
 import os
 import time
 import uuid
-from alfredai_engine import AlfredChatbot
-from speechtotext import SpeechToText
-from texttospeech import TextToSpeech
+from utils.alfredai_engine import AlfredChatbot
+from utils.speechtotext import SpeechToText
+from utils.texttospeech import TextToSpeech
 
 # Create audio output directory if it doesn't exist
 AUDIO_OUTPUT_DIR = "AudioOutput"
