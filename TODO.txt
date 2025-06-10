@@ -2,3 +2,6 @@
 2. Integrate the workflow
 3. Think of agents
 4. Decided to not use gui but make it complete cli version
+5. Resolved bug related to buffer overflow
+6. Need to add stopwords for better performance
+7. Have to edit the prompt to make the ai more sentient.

@@ -39,6 +39,7 @@ def main():
             stt.stop()
 
             user_input = stt.get_last_text()
+            stt.last_text = None # Reset last_text after processing
             if user_input and user_input.lower() in ["exit", "quit"]:
                 print("Alfred: Very well, sir. Until next time.")
                 break
