@@ -8,8 +8,8 @@
 #############################################################
 """
 import threading
+import os
 from RealtimeSTT import AudioToTextRecorder
-
 class SpeechToText:
     def __init__(self):
         self.recorder = AudioToTextRecorder()
