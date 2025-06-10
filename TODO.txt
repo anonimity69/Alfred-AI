@@ -1,3 +1,4 @@
 1. Design  a workflow
 2. Integrate the workflow
 3. Think of agents
+4. Decided to not use gui but make it complete cli version
