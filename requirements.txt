@@ -1,12 +1,11 @@
 # Audio and speech processing
-ffmpeg-python
 sounddevice
-SpeechRecognition
 pyaudio
 edge-tts
 simpleaudio
 pydub
-playsound
+realtimestt
+
 # Core libraries
 numpy
 torch
@@ -17,6 +16,6 @@ google-genai
 
 # Environment variable loader
 python-dotenv
-
+dotenv
 # GUI (tkinter comes with Python, no need to install via pip)
 # tk
