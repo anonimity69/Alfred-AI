@@ -1,5 +1,5 @@
 *.venv
-*.pvc
+*.pyc
 *.env
 *.log
 Outputs
