@@ -8,8 +8,23 @@
 #############################################################
 """
 import threading
+import time
 import os
+import sys
 from RealtimeSTT import AudioToTextRecorder
+import logging
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+custom_log_path = "logs/speech.log"
+rts_logger = logging.getLogger("realtimestt")
+rts_logger.setLevel(logging.DEBUG)
+custom_file_handler = logging.FileHandler(custom_log_path)
+custom_file_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter(
+    "%(asctime)s.%(msecs)03d - RealTimeSTT: %(name)s - %(levelname)s - %(message)s",
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+custom_file_handler.setFormatter(formatter)
+rts_logger.addHandler(custom_file_handler)
 class SpeechToText:
     def __init__(self):
         self.recorder = AudioToTextRecorder()
@@ -33,4 +48,3 @@ class SpeechToText:
     def get_last_text(self):
         return self.last_text
     
-
