@@ -1,77 +1,77 @@
-"""
-#############################################################
-# File        : main.py                                     #
-# Authors     : Shrayanendra Nath Mandal, Preetish Majumdar #
-# Date        : 2025-06-06                                  #
-# Description : Alfred AI Assistant - Key Activated Listen  #
-#############################################################
-"""
-
-import os
 import time
-import uuid
-import platform
-import subprocess
+import threading
+import tkinter as tk
+from tkinter import messagebox
 from utils.alfredai_engine import AlfredChatbot
 from utils.speechtotext import SpeechToText
 from utils.texttospeech import TextToSpeech
 
-# Create audio output directory if it doesn't exist
-AUDIO_OUTPUT_DIR = "AudioOutput"
-os.makedirs(AUDIO_OUTPUT_DIR, exist_ok=True)
+class AlfredGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Alfred AI Assistant")
+        self.root.geometry("400x250")
+        self.root.configure(bg="#1e1e1e")
 
-def play_audio(audio_file):
-    system_platform = platform.system()
-    try:
-        if system_platform == "Darwin":  # macOS
-            subprocess.run(["afplay", audio_file])
-        elif system_platform == "Windows":
-            os.startfile(audio_file)
-        elif system_platform == "Linux":
-            subprocess.run(["xdg-open", audio_file])
-        else:
-            print(f"Unsupported platform: {system_platform}. Cannot play audio.")
-    except Exception as e:
-        print(f"Error playing audio: {e}")
+        self.bot = AlfredChatbot()
+        self.stt = SpeechToText()
+        self.tts = TextToSpeech(voice="en-GB-RyanNeural")
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.label = tk.Label(self.root, text="Alfred AI", font=("Segoe UI", 18), fg="white", bg="#1e1e1e")
+        self.label.pack(pady=20)
+
+        self.listen_button = tk.Button(
+            self.root,
+            text="🎙️ Listen",
+            command=self.run_assistant,
+            bg="#2d2d2d",
+            fg="white",
+            font=("Segoe UI", 14),
+            relief="flat",
+            padx=20,
+            pady=10
+        )
+        self.listen_button.pack(pady=10)
+
+        self.response_label = tk.Label(self.root, text="", fg="white", bg="#1e1e1e", wraplength=350, justify="center")
+        self.response_label.pack(pady=20)
+
+    def run_assistant(self):
+        threading.Thread(target=self.assistant_logic).start()
+
+    def assistant_logic(self):
+        self.response_label.config(text="Listening... Speak now.")
+        self.stt.start()
+        time.sleep(5)
+        self.stt.stop()
+
+        user_input = self.stt.get_last_text()
+        self.stt.last_text = None
+
+        if not user_input:
+            self.response_label.config(text="I beg your pardon, sir. I didn't quite catch that.")
+            return
+
+        if user_input.lower() in ["exit", "quit"]:
+            self.response_label.config(text="Very well, sir. Until next time.")
+            self.root.after(2000, self.root.quit)
+            return
+
+        self.response_label.config(text=f"You said: {user_input}")
+
+        response = self.bot.chat(user_input)
+
+        self.response_label.config(text=f"Alfred: {response}")
+
+        self.tts.speak(response)
 
 def main():
-    print("Initializing Alfred AI Assistant...")
-    bot = AlfredChatbot()
-    stt = SpeechToText()
-    tts = TextToSpeech(voice="en-GB-RyanNeural")
-
-    print("Alfred is ready. Say 'exit' or 'quit' to stop.\n")
-
-    try:
-        while True:
-            print("Listening... Please speak clearly.")
-            stt.start()
-            time.sleep(5)  # Adjust duration as needed
-            stt.stop()
-
-            user_input = stt.get_last_text()
-            stt.last_text = None  # Reset last_text after processing
-
-            if user_input and user_input.lower() in ["exit", "quit"]:
-                print("Alfred: Very well, sir. Until next time.")
-                break
-
-            if not user_input:
-                print("Alfred: I beg your pardon, sir. I didn't quite catch that.")
-                continue
-
-            print(f"\nYou said: {user_input}")
-            alfred_response = bot.chat(user_input)
-
-            audio_file = os.path.join(AUDIO_OUTPUT_DIR, f"alfred_reply_{uuid.uuid4()}.mp3")
-            tts.generate(alfred_response, audio_file)
-            print(f"Speech saved to {audio_file}")
-            play_audio(audio_file)
-
-    except KeyboardInterrupt:
-        print("\nAlfred: Very well, sir. I shall take my leave.")
-    finally:
-        stt.stop()
+    root = tk.Tk()
+    app = AlfredGUI(root)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
