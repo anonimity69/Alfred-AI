@@ -3,24 +3,38 @@
 # File        : texttospeech.py                             #
 # Authors     : Shrayanendra Nath Mandal, Preetish Majumdar #
 # Date        : 2025-06-01                                  #
-# Description : GUI-based Alfred AI Assistant using Gemini  #
-#               API, Speech Recognition, and Text to Speech #
+# Description : Text to Speech using Edge TTS               #
 #############################################################
 """
-import pyttsx3
+
+import asyncio
+import edge_tts
+import tempfile
+import os
+import platform
+import subprocess
 
 class TextToSpeech:
-    def __init__(self, voice="english"):
-        self.engine = pyttsx3.init()
-        self.engine.setProperty("rate", 180)
-        voices = self.engine.getProperty("voices")
-        
-        # Choose a voice that matches
-        for v in voices:
-            if "Ryan" in v.name or "en_GB" in v.id:
-                self.engine.setProperty("voice", v.id)
-                break
+    def __init__(self, voice="en-GB-RyanNeural"):
+        self.voice = voice
+
+    async def _speak_async(self, text):
+        # Generate audio using edge-tts
+        communicate = edge_tts.Communicate(text, self.voice)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+            temp_audio_path = f.name
+        await communicate.save(temp_audio_path)
+
+        # Play audio (cross-platform)
+        if platform.system() == "Windows":
+            subprocess.run(["start", "/min", temp_audio_path], shell=True)
+        elif platform.system() == "Darwin":  # macOS
+            subprocess.run(["afplay", temp_audio_path])
+        else:  # Linux
+            subprocess.run(["mpg123", temp_audio_path])
+
+        # Optionally delete the file later
+        # os.remove(temp_audio_path)
 
     def speak(self, text):
-        self.engine.say(text)
-        self.engine.runAndWait()
+        asyncio.run(self._speak_async(text))
